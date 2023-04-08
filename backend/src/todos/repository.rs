@@ -1,8 +1,9 @@
-use ::serde::{Deserialize, Serialize};
 use anyhow::{anyhow, Result};
 use axum::async_trait;
 use tokio::sync::Mutex;
 use ulid::Ulid;
+
+use self::dto::{Todo, TodoDetails};
 
 pub struct InMemoryTodoRepository {
     todos: Mutex<Vec<Todo>>,
@@ -14,7 +15,7 @@ pub trait TodoRepository {
     async fn get_by_id(&self, id: Ulid) -> Result<Todo>;
     async fn delete_by_id(&self, id: Ulid) -> Result<()>;
     async fn update(&self, id: Ulid, details: TodoDetails) -> Result<()>;
-    async fn add(&self, todo: Todo) -> Result<()>;
+    async fn add(&self, todo: &Todo) -> Result<()>;
 }
 
 impl InMemoryTodoRepository {
@@ -58,29 +59,34 @@ impl TodoRepository for InMemoryTodoRepository {
         Ok(())
     }
 
-    async fn add(&self, todo: Todo) -> Result<()> {
-        self.todos.lock().await.push(todo);
+    async fn add(&self, todo: &Todo) -> Result<()> {
+        self.todos.lock().await.push(todo.clone());
         Ok(())
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct TodoDetails {
-    pub title: String,
-}
+pub mod dto {
+    use serde::{Deserialize, Serialize};
+    use ulid::Ulid;
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct Todo {
-    id: Ulid,
-    title: String,
-}
+    #[derive(Serialize, Deserialize, Clone)]
+    pub struct TodoDetails {
+        pub title: String,
+    }
 
-impl Todo {
-    pub fn new(title: impl Into<String>) -> Self {
-        let title = title.into();
-        Todo {
-            id: Ulid::new(),
-            title,
+    #[derive(Serialize, Deserialize, Clone)]
+    pub struct Todo {
+        pub id: Ulid,
+        pub title: String,
+    }
+
+    impl Todo {
+        pub fn new(title: impl Into<String>) -> Self {
+            let title = title.into();
+            Todo {
+                id: Ulid::new(),
+                title,
+            }
         }
     }
 }
