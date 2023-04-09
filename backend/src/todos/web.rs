@@ -1,6 +1,6 @@
 use crate::todos::repository::{
     dto::{Todo, TodoDetails},
-    InMemoryTodoRepository, TodoRepository,
+    TodoRepository,
 };
 
 use axum::{
@@ -13,25 +13,30 @@ use serde::Deserialize;
 use std::sync::Arc;
 use ulid::Ulid;
 
-pub fn get_todos_routes() -> Router {
+pub fn get_todos_routes<R: TodoRepository + Sync + Send + 'static>(repository: R) -> Router {
     Router::new()
         .route("/", get(find_all))
         .route("/", post(new))
         .route("/:id", get(find_by_id))
         .route("/:id", delete(delete_by_id))
         .route("/:id", put(update_by_id))
-        .with_state(Arc::new(InMemoryTodoRepository::new()))
+        .with_state(Arc::new(repository))
 }
 
 #[derive(Deserialize)]
 pub struct NewTodoDto {
     pub title: String,
+    pub completed: bool,
 }
 
 async fn find_all(
     State(todo_repo): State<Arc<impl TodoRepository>>,
 ) -> Result<Json<Vec<Todo>>, StatusCode> {
-    Ok(todo_repo.get_all().await.into())
+    Ok(todo_repo
+        .get_all()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .into())
 }
 
 async fn find_by_id(
@@ -66,6 +71,7 @@ async fn update_by_id(
             id,
             TodoDetails {
                 title: details.title.clone(),
+                completed: details.completed,
             },
         )
         .await
