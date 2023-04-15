@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use axum::async_trait;
 use ulid::Ulid;
 
-use self::dto::{Todo, TodoDetails};
+use self::model::{Todo, TodoDetails};
 
 use super::data_source::{TodoDataSource, TodoEntityInsert, TodoEntityUpdate};
 
@@ -77,62 +77,14 @@ impl<T: TodoDataSource + Send + Sync> TodoRepository for DataSourceTodoRepositor
     async fn add(&self, todo: &Todo) -> Result<()> {
         self.data_source
             .add(&TodoEntityInsert {
-                uid: todo.id.to_string().as_str(),
+                uid: todo.uid.to_string().as_str(),
                 title: todo.title.as_str(),
-                completed: false,
-                completed_at: None,
+                completed: todo.completed,
+                completed_at: todo.completed_at,
             })
             .await?;
         Ok(())
     }
 }
 
-pub mod dto {
-    use serde::{Deserialize, Serialize};
-    use ulid::{DecodeError, Ulid};
-
-    #[derive(Serialize, Deserialize, Clone)]
-    pub struct TodoDetails {
-        pub title: String,
-        pub completed: bool,
-    }
-
-    #[derive(Serialize, Deserialize, Clone)]
-    pub struct Todo {
-        pub id: Ulid,
-        pub title: String,
-        pub completed: bool,
-        pub created_at: String,
-        pub completed_at: Option<String>,
-        pub updated_at: String,
-    }
-
-    impl Todo {
-        pub fn new(title: impl Into<String>) -> Self {
-            let title = title.into();
-            Todo {
-                id: Ulid::new(),
-                title,
-                completed: false,
-                completed_at: None,
-                created_at: chrono::Utc::now().to_string(),
-                updated_at: chrono::Utc::now().to_string(),
-            }
-        }
-    }
-
-    impl TryFrom<&super::super::data_source::TodoEntity> for Todo {
-        type Error = DecodeError;
-
-        fn try_from(todo: &super::super::data_source::TodoEntity) -> Result<Self, Self::Error> {
-            Ok(Todo {
-                id: Ulid::from_string(todo.uid.as_str())?,
-                title: todo.title.clone(),
-                completed: todo.completed,
-                completed_at: todo.completed_at.clone().map(|date| date.to_string()),
-                created_at: todo.created_at.to_string(),
-                updated_at: todo.updated_at.to_string(),
-            })
-        }
-    }
-}
+pub mod model;

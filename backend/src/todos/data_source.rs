@@ -5,9 +5,11 @@ use axum::async_trait;
 use tokio::sync::Mutex;
 
 use diesel::prelude::*;
-use ulid::Ulid;
+use ulid::{DecodeError, Ulid};
 
 use crate::schema::todos;
+
+use super::repository::model::Todo;
 
 #[async_trait]
 pub trait TodoDataSource {
@@ -100,5 +102,21 @@ impl TodoDataSource for DieselTodoDataSource {
             ))
             .execute(&mut *self.conn.lock().await)?;
         Ok(())
+    }
+}
+
+impl TryFrom<&TodoEntity> for Todo {
+    type Error = DecodeError;
+
+    fn try_from(todo: &TodoEntity) -> Result<Self, Self::Error> {
+        Ok(Todo {
+            id: Some(todo.id),
+            uid: Ulid::from_string(todo.uid.as_str())?,
+            title: todo.title.clone(),
+            completed: todo.completed,
+            created_at: todo.created_at,
+            completed_at: todo.completed_at,
+            updated_at: todo.updated_at,
+        })
     }
 }
